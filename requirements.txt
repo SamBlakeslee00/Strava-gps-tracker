@@ -1,0 +1,5 @@
+Flask
+requests
+geopy
+pandas
+gunicorn
