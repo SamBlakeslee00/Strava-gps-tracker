@@ -5,17 +5,13 @@ import os
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-# Debug: Print environment variables
-print(f"CLIENT_ID from env: {os.getenv('CLIENT_ID')}")
-print(f"CLIENT_SECRET exists: {'Yes' if os.getenv('CLIENT_SECRET') else 'No'}")
-print(f"All env vars: {list(os.environ.keys())}")
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "max-laps-challenge-2025")
+app.secret_key = "max-laps-challenge-2025"
 
-# Strava API credentials
-CLIENT_ID = os.getenv("162020")
-CLIENT_SECRET = os.getenv("61bcb36a6ca4ac4ed59edaaf5ea9fb5f9172cec3")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "https://strava-gps-tracker.onrender.com")
+# Strava API credentials - hardcoded
+CLIENT_ID = "162020"
+CLIENT_SECRET = "61bcb36a6ca4ac4ed59edaaf5ea9fb5f9172cec3"
+REDIRECT_URI = "https://strava-gps-tracker.onrender.com/callback"
 
 # Target segments for MAX Laps Challenge
 TARGET_SEGMENTS = {
