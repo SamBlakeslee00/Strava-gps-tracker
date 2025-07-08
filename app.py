@@ -20,7 +20,7 @@ app.secret_key = os.getenv("SECRET_KEY", "max-laps-challenge-2025")
 # Strava API credentials
 CLIENT_ID = os.getenv("162020")
 CLIENT_SECRET = os.getenv("61bcb36a6ca4ac4ed59edaaf5ea9fb5f9172cec3")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "https://strava-gps-tracker.onrender.com/callback")
+REDIRECT_URI = os.getenv("REDIRECT_URI", "https://strava-gps-tracker.onrender.com")
 
 # Target segments for MAX Laps Challenge
 TARGET_SEGMENTS = {
