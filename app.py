@@ -5,11 +5,6 @@ import os
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-# Debug: Print actual values
-print(f"CLIENT_ID value: '{CLIENT_ID}'")
-print(f"Length of CLIENT_ID: {len(str(CLIENT_ID)) if CLIENT_ID else 0}")
-print(f"CLIENT_ID type: {type(CLIENT_ID)}")
-
 # Debug: Print environment variables
 print(f"CLIENT_ID from env: {os.getenv('CLIENT_ID')}")
 print(f"CLIENT_SECRET exists: {'Yes' if os.getenv('CLIENT_SECRET') else 'No'}")
