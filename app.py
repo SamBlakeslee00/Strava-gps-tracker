@@ -5,6 +5,10 @@ import os
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+# Debug: Print environment variables
+print(f"CLIENT_ID from env: {os.getenv('CLIENT_ID')}")
+print(f"CLIENT_SECRET exists: {'Yes' if os.getenv('CLIENT_SECRET') else 'No'}")
+print(f"All env vars: {list(os.environ.keys())}")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "max-laps-challenge-2025")
 
