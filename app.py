@@ -1,6 +1,8 @@
 from flask import Flask, request, redirect, session, url_for
 import requests
 import os
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = "max-laps-challenge-2025-secret-key"
@@ -80,6 +82,36 @@ def dashboard():
         return redirect('/')
     
     athlete = session.get('athlete', {})
+    token = session['access_token']
+    
+    # Get time period from query params
+    days = int(request.args.get('days', 30))
+    
+    # Fetch activities and count laps
+    lap_data = get_lap_counts(token, days)
+    
+    # Build leaderboard HTML
+    leaderboard_html = ""
+    for segment_id, segment_name in TARGET_SEGMENTS.items():
+        leaderboard_html += f'<div class="segment"><h3>{"🏃" if "Run" in segment_name else "🚴"} {segment_name}</h3>'
+        
+        if segment_id in lap_data and lap_data[segment_id]:
+            leaderboard_html += '<table><tr><th>Rank</th><th>Athlete</th><th>Laps</th><th>Best Time</th></tr>'
+            
+            # Sort by lap count
+            sorted_athletes = sorted(lap_data[segment_id].items(), key=lambda x: x[1]['count'], reverse=True)
+            
+            for rank, (athlete_name, data) in enumerate(sorted_athletes[:20], 1):
+                best_time = min(data['times']) if data['times'] else 0
+                mins = best_time // 60
+                secs = best_time % 60
+                leaderboard_html += f'<tr><td>{rank}</td><td>{athlete_name}</td><td><strong>{data["count"]}</strong></td><td>{mins}:{secs:02d}</td></tr>'
+            
+            leaderboard_html += '</table>'
+        else:
+            leaderboard_html += '<p>No activities found for this segment in the selected period.</p>'
+        
+        leaderboard_html += '</div>'
     
     return f'''
     <!DOCTYPE html>
@@ -88,9 +120,14 @@ def dashboard():
         <title>MAX Laps Dashboard</title>
         <style>
             body {{ font-family: Arial, sans-serif; margin: 40px; }}
-            .container {{ max-width: 800px; margin: 0 auto; }}
+            .container {{ max-width: 900px; margin: 0 auto; }}
             .segment {{ background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 5px; }}
             .btn {{ background-color: #fc4c02; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin: 5px; }}
+            .filters {{ text-align: center; margin: 20px 0; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+            th, td {{ padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }}
+            th {{ background-color: #fc4c02; color: white; }}
+            tr:hover {{ background-color: #f0f0f0; }}
         </style>
     </head>
     <body>
@@ -98,19 +135,23 @@ def dashboard():
             <h1>🏔️ MAX Laps Dashboard</h1>
             <p>Welcome {athlete.get('firstname', '')} {athlete.get('lastname', '')}!</p>
             
-            <h2>Tracking These Segments:</h2>
-            <div class="segment">
-                <h3>🏃 Smuggler Uphill Trail Run</h3>
-                <p>Segment ID: 4805244</p>
-            </div>
-            <div class="segment">
-                <h3>🚴 ACC - Smuggler TT (Ride)</h3>
-                <p>Segment ID: 2344230</p>
+            <div class="filters">
+                <strong>Time Period:</strong>
+                <a href="?days=7" class="btn {'active' if days == 7 else ''}">Last 7 Days</a>
+                <a href="?days=30" class="btn {'active' if days == 30 else ''}">Last 30 Days</a>
+                <a href="?days=90" class="btn {'active' if days == 90 else ''}">Last 90 Days</a>
             </div>
             
-            <p><em>Full leaderboard functionality coming soon!</em></p>
+            <h2>🏆 Leaderboard (Last {days} Days)</h2>
+            {leaderboard_html}
             
-            <a href="/logout" class="btn">Logout</a>
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="/logout" class="btn">Logout</a>
+            </div>
+            
+            <p style="text-align: center; color: #666; margin-top: 20px;">
+                <small>Note: Shows activities from people you follow. Make sure activities are public!</small>
+            </p>
         </div>
     </body>
     </html>
@@ -120,6 +161,65 @@ def dashboard():
 def logout():
     session.clear()
     return redirect('/')
+
+def get_lap_counts(token, days):
+    """Fetch activities and count laps on target segments"""
+    headers = {'Authorization': f'Bearer {token}'}
+    after_date = datetime.now() - timedelta(days=days)
+    
+    # Get activities from people you follow
+    activities = []
+    page = 1
+    
+    while True:
+        params = {
+            'page': page,
+            'per_page': 100,
+            'after': int(after_date.timestamp())
+        }
+        
+        response = requests.get(
+            'https://www.strava.com/api/v3/activities/following',
+            headers=headers,
+            params=params
+        )
+        
+        if response.status_code == 200:
+            batch = response.json()
+            if not batch:
+                break
+            activities.extend(batch)
+            if len(batch) < 100:
+                break
+            page += 1
+        else:
+            break
+    
+    # Process activities for segment efforts
+    lap_counts = defaultdict(lambda: defaultdict(lambda: {'count': 0, 'times': []}))
+    
+    for activity in activities:
+        activity_id = activity.get('id')
+        
+        # Get full activity details
+        response = requests.get(
+            f'https://www.strava.com/api/v3/activities/{activity_id}',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            full_activity = response.json()
+            athlete_name = f"{full_activity.get('athlete', {}).get('firstname', '')} {full_activity.get('athlete', {}).get('lastname', '')}".strip()
+            
+            # Check segment efforts
+            for effort in full_activity.get('segment_efforts', []):
+                segment_id = str(effort.get('segment', {}).get('id', ''))
+                
+                if segment_id in TARGET_SEGMENTS:
+                    lap_counts[segment_id][athlete_name]['count'] += 1
+                    lap_counts[segment_id][athlete_name]['times'].append(effort.get('elapsed_time', 0))
+    
+    return lap_counts
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
